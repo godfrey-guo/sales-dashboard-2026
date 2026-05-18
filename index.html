@@ -553,7 +553,11 @@ function renderKPIs({data, scope, rev, target, timeLabel}) {
   
   document.getElementById('kpiDevRate').textContent = ((data.devrate||0)*100).toFixed(1);
   document.getElementById('kpiPen').textContent = ((data.penetration||0)*100).toFixed(1);
-  document.getElementById('kpiAvg').textContent = ((data.avg_price||0)/10000).toFixed(1);
+  
+  // 重新計算全年客單價 (避免後端組別 mapping 造成的 0 元 bug)
+  let yearlyRev = data.rev_months ? data.rev_months.reduce((a, b) => a + b, 0) : (data.revenue || 0);
+  let avgPrice = (data.coop && data.coop > 0) ? (yearlyRev / data.coop) : 0;
+  document.getElementById('kpiAvg').textContent = (avgPrice / 10000).toFixed(1);
   
   const view = document.getElementById('filterView').value;
   const gFilter = document.getElementById('filterGroup').value;
@@ -623,7 +627,9 @@ function renderRankings() {
       let mStart = {'q1':0, 'q2':3, 'q3':6, 'q4':9}[timeFilter];
       tRev = (s.rev_months[mStart]||0) + (s.rev_months[mStart+1]||0) + (s.rev_months[mStart+2]||0);
     }
-    return {...s, displayRev: tRev};
+    let yearlyRev = s.rev_months ? s.rev_months.reduce((a,b)=>a+b, 0) : s.revenue;
+    let sAvg = s.coop > 0 ? (yearlyRev / s.coop) : 0;
+    return {...s, displayRev: tRev, displayAvg: sAvg};
   });
 
   salesList.sort((a,b)=>b.displayRev - a.displayRev);
@@ -645,7 +651,7 @@ function renderRankings() {
         </td>
         <td><span class="${penCls}">${(s.penetration*100).toFixed(1)}%</span></td>
         <td><span class="${devCls}">${(s.devrate*100).toFixed(1)}%</span></td>
-        <td>${(s.avg_price/10000).toFixed(2)}</td>
+        <td>${(s.displayAvg/10000).toFixed(2)}</td>
       </tr>`;
   });
 }
