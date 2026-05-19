@@ -201,6 +201,25 @@ tr:hover td { background:#F8FAFC; }
 .chart-wrap { position:relative; height:300px; width: 100%; }
 .footer { text-align:center; font-size:13px; font-weight:500; color:var(--text-muted); margin-top:32px; padding-bottom: 20px;}
 
+/* Action insight cards */
+.insight-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.insight-card { background:#FAFCFB; border:1px solid var(--border); border-radius:8px; padding:16px; min-height:108px; }
+.insight-label { font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px; }
+.insight-value { font-size:28px; font-weight:800; color:var(--text-main); line-height:1.1; }
+.insight-value .unit { font-size:13px; color:var(--text-muted); margin-left:4px; font-weight:700; }
+.insight-note { font-size:12px; color:var(--text-muted); margin-top:8px; line-height:1.5; }
+.insight-highlight { color:var(--success); }
+.insight-warning { color:var(--warning); }
+.opportunity-list { display:flex; flex-direction:column; gap:12px; }
+.opportunity-item { display:grid; grid-template-columns:1.2fr 1fr auto; gap:14px; align-items:center; padding:14px; border:1px solid var(--border); border-radius:8px; background:#FAFCFB; }
+.op-title { font-size:15px; font-weight:800; color:var(--text-main); }
+.op-sub { font-size:12px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+.op-bar-bg { height:7px; background:#E5ECEC; border-radius:999px; overflow:hidden; }
+.op-bar-fill { height:100%; background:linear-gradient(90deg,var(--primary),#6B8A8F); border-radius:999px; }
+.op-metrics { display:flex; gap:12px; justify-content:flex-end; white-space:nowrap; }
+.op-metric strong { display:block; font-size:18px; color:var(--text-main); }
+.op-metric span { display:block; font-size:11px; color:var(--text-muted); margin-top:2px; }
+
 /* ================= RWD 響應式設計 ================= */
 @media (max-width: 1200px) {
   body { padding: 16px; }
@@ -210,6 +229,7 @@ tr:hover td { background:#F8FAFC; }
 
 @media (max-width: 992px) {
   .city-grid { grid-template-columns: repeat(2, 1fr); }
+  .insight-grid { grid-template-columns: repeat(2, 1fr); }
   .filter-divider { display: none; }
 }
 
@@ -220,11 +240,14 @@ tr:hover td { background:#F8FAFC; }
   .btn-reset { margin-left: 0; width: 100%; padding: 12px; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .kpi-overview-value { font-size: 40px; }
+  .opportunity-item { grid-template-columns: 1fr; align-items: start; }
+  .op-metrics { justify-content: flex-start; }
 }
 
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr; }
   .city-grid { grid-template-columns: 1fr; }
+  .insight-grid { grid-template-columns: 1fr; }
   .target-labels { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 </style>
@@ -361,12 +384,12 @@ tr:hover td { background:#F8FAFC; }
 
 <div class="row">
   <div class="card">
-    <div class="card-title">📈 2026 月份業績趨勢</div>
-    <div class="chart-wrap"><canvas id="monthChart"></canvas></div>
+    <div class="card-title">📈 個人 / 組內貢獻</div>
+    <div class="insight-grid" id="contributionGrid"></div>
   </div>
   <div class="card">
-    <div class="card-title">🗺️ 縣市分佈 (TOP 8)</div>
-    <div class="city-grid" id="cityGrid"></div>
+    <div class="card-title">🎯 開發機會優先順序</div>
+    <div class="opportunity-list" id="opportunityList"></div>
   </div>
 </div>
 
@@ -376,7 +399,6 @@ tr:hover td { background:#F8FAFC; }
 const API_URL = 'https://script.google.com/macros/s/AKfycbz2YqTmEMwMvEb-1r-n74i5cYYq1CKJOFKjdxNOsPLK4Xmwi2IIpneshu3bjpo_Sjm4PA/exec';
 let globalData = null; 
 let groupPie = null;
-let monthChart = null;
 
 async function init() {
   try {
@@ -471,7 +493,7 @@ function renderAll() {
   renderCases(filterData.data);
   renderRankings();
   renderCharts();
-  renderCities();
+  renderActionInsights(filterData);
 }
 
 function renderKPIs({data, scope, rev, target, timeLabel}) {
@@ -596,54 +618,117 @@ function renderCharts() {
     }
   });
 
-  if (monthChart) monthChart.destroy();
-  const ctx = document.getElementById('monthChart').getContext('2d');
-  let gradient = ctx.createLinearGradient(0, 0, 0, 300);
-  gradient.addColorStop(0, '#263E44');
-  gradient.addColorStop(1, '#6B8A8F');
-  
-  let mLabels = globalData.monthly.map(m=>m.month+'月');
-  let mData = globalData.monthly.map(m=>m.revenue/10000);
-  
-  if (timeFilter !== 'year') {
-    let mStart = {'q1':0, 'q2':3, 'q3':6, 'q4':9}[timeFilter];
-    mLabels = mLabels.slice(mStart, mStart+3);
-    mData = mData.slice(mStart, mStart+3);
-  }
-  
-  monthChart = new Chart(ctx,{
-    type:'bar',
-    data:{ 
-      labels: mLabels,
-      datasets:[{ 
-        label:'業績(萬)', data: mData,
-        backgroundColor: gradient,
-        borderRadius: 6, barThickness: 'flex', maxBarThickness: 40
-      }] 
-    },
-    options:{ 
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false} },
-      scales:{ 
-        y:{ grid: { color: '#EEF3F2' }, border: { display: false } },
-        x:{ grid: { display: false }, border: { display: false } }
-      } 
-    }
-  });
 }
 
-function renderCities() {
-  const cityBox = document.getElementById('cityGrid');
-  cityBox.innerHTML = '';
-  globalData.cities.slice(0,8).forEach(c=>{
-    const pct = c.penetration || (c.cases ? c.coop / c.cases : 0);
-    cityBox.innerHTML += `
-      <div class="city-item">
-        <div class="city-name">${c.city}</div>
-        <div class="city-rev">${(c.cases || c.total || 0).toLocaleString()} <span style="font-size:11px;color:#9CA3AF">案</span></div>
-        <div class="city-pen">${c.coop || 0}/${c.cases || c.total || 0} 合作 · 滲透 ${(pct*100).toFixed(1)}%</div>
+function getPeriodRevenue(item, timeFilter) {
+  if (!item) return 0;
+  if (timeFilter === 'year') return item.revenue || (item.rev_months ? item.rev_months.reduce((a,b)=>a+b,0) : 0);
+  const mStart = {'q1':0, 'q2':3, 'q3':6, 'q4':9}[timeFilter];
+  return item.rev_months ? (item.rev_months[mStart]||0) + (item.rev_months[mStart+1]||0) + (item.rev_months[mStart+2]||0) : 0;
+}
+
+function renderActionInsights({data, rev, target}) {
+  const view = document.getElementById('filterView').value;
+  const timeFilter = document.getElementById('filterTime').value;
+  const contributionBox = document.getElementById('contributionGrid');
+  const opportunityBox = document.getElementById('opportunityList');
+  const formatPct = v => `${(v * 100).toFixed(1)}%`;
+  const format萬 = v => (v / 10000).toLocaleString('zh-TW', {maximumFractionDigits: 0});
+  const allSales = getVisibleSales();
+  const currentGroup = data.group ? globalData.groups.find(g => g.name === data.group) : data;
+  const groupRev = currentGroup && currentGroup.rev_months ? getPeriodRevenue(currentGroup, timeFilter) : rev;
+  const groupMembers = data.group ? allSales.filter(s => s.group === data.group) : allSales;
+  const rankedMembers = groupMembers
+    .map(s => ({...s, periodRev: getPeriodRevenue(s, timeFilter)}))
+    .sort((a,b) => b.periodRev - a.periodRev);
+  const rankIndex = data.name ? rankedMembers.findIndex(s => s.name === data.name) : -1;
+  const share = groupRev > 0 ? rev / groupRev : 0;
+  const targetGap = Math.max((target || 0) - rev, 0);
+  const uncontacted = Math.max((data.cases || 0) - (data.coop || 0), 0);
+  const avgPerOpen = uncontacted > 0 ? targetGap / uncontacted : 0;
+  const coopShare = currentGroup && currentGroup.coop ? (data.coop || 0) / currentGroup.coop : 0;
+
+  if (view === 'sales' && data.name) {
+    contributionBox.innerHTML = `
+      <div class="insight-card">
+        <div class="insight-label">組內業績占比</div>
+        <div class="insight-value">${formatPct(share)}</div>
+        <div class="insight-note">${data.name} / ${data.group}，用選定期間業績計算</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">組內排名</div>
+        <div class="insight-value">${rankIndex >= 0 ? rankIndex + 1 : '-'}<span class="unit"> / ${rankedMembers.length}</span></div>
+        <div class="insight-note">依選定期間業績由高到低排序</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">合作建案占組比</div>
+        <div class="insight-value">${formatPct(coopShare)}</div>
+        <div class="insight-note">${data.coop || 0} 個合作建案 / 組內 ${currentGroup ? currentGroup.coop || 0 : 0} 個</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">尚未合作建案</div>
+        <div class="insight-value insight-warning">${uncontacted}<span class="unit">案</span></div>
+        <div class="insight-note">負責區域內可優先開發的建案量</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">距離目標差額</div>
+        <div class="insight-value">${format萬(targetGap)}<span class="unit">萬</span></div>
+        <div class="insight-note">目標未設定或已達標時為 0</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">每個未合作案需補</div>
+        <div class="insight-value">${format萬(avgPerOpen)}<span class="unit">萬</span></div>
+        <div class="insight-note">距離目標差額 ÷ 未合作建案</div>
       </div>`;
-  });
+  } else {
+    const totalRev = view === 'group' ? groupRev : getPeriodRevenue(globalData.overview, timeFilter);
+    const best = rankedMembers[0];
+    const openCases = (data.regions || []).reduce((sum, r) => sum + (r.uncontacted || 0), 0);
+    contributionBox.innerHTML = `
+      <div class="insight-card">
+        <div class="insight-label">目前範圍業績</div>
+        <div class="insight-value">${format萬(totalRev)}<span class="unit">萬</span></div>
+        <div class="insight-note">依目前時間與檢視對象計算</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">最高貢獻業務</div>
+        <div class="insight-value" style="font-size:24px">${best ? best.name : '-'}</div>
+        <div class="insight-note">${best ? `${format萬(best.periodRev)} 萬，占 ${formatPct(totalRev ? best.periodRev / totalRev : 0)}` : '目前無資料'}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">未合作建案池</div>
+        <div class="insight-value insight-warning">${openCases}<span class="unit">案</span></div>
+        <div class="insight-note">目前範圍內仍可開發的建案量</div>
+      </div>`;
+  }
+
+  const opportunities = (data.regions || [])
+    .map(r => ({...r, pct: r.cases ? r.coop / r.cases : 0}))
+    .filter(r => (r.uncontacted || 0) > 0)
+    .sort((a,b) => (b.uncontacted - a.uncontacted) || (a.pct - b.pct))
+    .slice(0,5);
+
+  if (!opportunities.length) {
+    opportunityBox.innerHTML = '<div style="padding:20px; color:#9CA3AF;">目前沒有可顯示的未合作建案區域</div>';
+    return;
+  }
+
+  opportunityBox.innerHTML = opportunities.map(r => `
+    <div class="opportunity-item">
+      <div>
+        <div class="op-title">${r.city}</div>
+        <div class="op-sub">${r.areas ? r.areas : '全部行政區'}</div>
+      </div>
+      <div>
+        <div class="op-bar-bg"><div class="op-bar-fill" style="width:${Math.min(r.pct * 100, 100).toFixed(0)}%"></div></div>
+        <div class="op-sub">滲透 ${formatPct(r.pct)}</div>
+      </div>
+      <div class="op-metrics">
+        <div class="op-metric"><strong>${r.uncontacted}</strong><span>待開發</span></div>
+        <div class="op-metric"><strong>${r.coop}</strong><span>已合作</span></div>
+        <div class="op-metric"><strong>${r.cases}</strong><span>負責案</span></div>
+      </div>
+    </div>`).join('');
 }
 
 init();
