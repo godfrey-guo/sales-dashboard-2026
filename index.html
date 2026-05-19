@@ -582,7 +582,7 @@ function renderCases(data) {
   let stat, devSub, levelMap;
   if (view==='group' && gFilter!=='all') { stat=data.status; devSub=data.dev_sub; levelMap=data.level; }
   else if (view==='sales' && sFilter!=='all') { stat={'合作':data.coop,'開發中':data.cases-data.coop,'未開發':0}; devSub={}; levelMap={}; }
-  else { stat=globalData.status; devSub=globalData.dev_sub; levelMap=globalData.level; }
+  else { stat=globalData.overview.status; devSub=globalData.overview.dev_sub; levelMap=globalData.overview.level; }
   
   const total = (stat['合作']||0)+(stat['開發中']||0)+(stat['未開發']||0);
   document.getElementById('udCount').textContent = stat['未開發']||0;
