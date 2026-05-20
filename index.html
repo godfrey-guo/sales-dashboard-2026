@@ -219,6 +219,19 @@ tr:hover td { background:#F8FAFC; }
 .op-metrics { display:flex; gap:12px; justify-content:flex-end; white-space:nowrap; }
 .op-metric strong { display:block; font-size:18px; color:var(--text-main); }
 .op-metric span { display:block; font-size:11px; color:var(--text-muted); margin-top:2px; }
+.is-hidden { display:none !important; }
+.financial-table { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; min-width:0; }
+.financial-table th { padding:10px 8px; background:#F3F7F6; color:var(--text-muted); border-bottom:1px solid var(--border); white-space:nowrap; }
+.financial-table td { padding:12px 8px; border-bottom:1px solid #EEF3F2; white-space:nowrap; vertical-align:middle; }
+.financial-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+.financial-group { font-weight:800; color:var(--text-main); }
+.financial-share { display:flex; align-items:center; gap:8px; min-width:130px; }
+.financial-share-bg { flex:1; height:7px; border-radius:999px; background:#E5ECEC; overflow:hidden; }
+.financial-share-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--primary),#6B8A8F); }
+.financial-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.financial-summary-item { background:#FAFCFB; border:1px solid var(--border); border-radius:8px; padding:12px; }
+.financial-summary-label { font-size:11px; color:var(--text-muted); font-weight:700; }
+.financial-summary-value { font-size:20px; color:var(--text-main); font-weight:800; margin-top:4px; }
 
 /* ================= RWD 響應式設計 ================= */
 @media (max-width: 1200px) {
@@ -299,7 +312,7 @@ tr:hover td { background:#F8FAFC; }
   <button class="btn btn-reset" onclick="resetFilter()">重置設定</button>
 </div>
 
-<div class="row kpi-main-row">
+<div class="row kpi-main-row" id="sectionKpi">
   <div class="kpi-overview">
     <div>
       <div class="kpi-overview-title">營業額 (<span id="kpiTimeLabel">全年</span>)</div>
@@ -356,7 +369,7 @@ tr:hover td { background:#F8FAFC; }
   </div>
 </div>
 
-<div class="row row-full">
+<div class="row row-full" id="sectionRegion">
   <div class="card">
     <div class="card-title">📍 區域負責建案總覽</div>
     <div class="region-grid" id="regionGrid"></div>
@@ -364,7 +377,7 @@ tr:hover td { background:#F8FAFC; }
 </div>
 
 <div class="row">
-  <div class="card">
+  <div class="card" id="cardRanking">
     <div class="card-title">🏆 業務員業績排行</div>
     <div class="table-responsive">
       <table id="salesRankTable">
@@ -376,18 +389,32 @@ tr:hover td { background:#F8FAFC; }
       </table>
     </div>
   </div>
-  <div class="card">
-    <div class="card-title">📊 組別業績佔比</div>
-    <div class="chart-wrap"><canvas id="groupPie"></canvas></div>
+  <div class="card" id="cardGroupPie">
+    <div class="card-title">📊 組別營收結構</div>
+    <div id="groupFinancialSummary" class="financial-summary"></div>
+    <div class="table-responsive">
+      <table class="financial-table" id="groupFinancialTable">
+        <thead><tr>
+          <th>組別</th>
+          <th class="num">選定期間業績</th>
+          <th>占比</th>
+          <th class="num">滲透率</th>
+          <th class="num">客單價</th>
+          <th class="num">目標</th>
+          <th class="num">達成率</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <div class="row">
-  <div class="card">
-    <div class="card-title">📈 個人 / 組內貢獻</div>
+  <div class="card" id="cardContribution">
+    <div class="card-title">📈 2026 全年滲透率 / 客單價排行</div>
     <div class="insight-grid" id="contributionGrid"></div>
   </div>
-  <div class="card">
+  <div class="card" id="cardOpportunity">
     <div class="card-title">🎯 開發機會優先順序</div>
     <div class="opportunity-list" id="opportunityList"></div>
   </div>
@@ -398,7 +425,6 @@ tr:hover td { background:#F8FAFC; }
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbz2YqTmEMwMvEb-1r-n74i5cYYq1CKJOFKjdxNOsPLK4Xmwi2IIpneshu3bjpo_Sjm4PA/exec';
 let globalData = null; 
-let groupPie = null;
 
 async function init() {
   try {
@@ -454,6 +480,36 @@ function resetFilter() {
   renderAll();
 }
 
+function getCurrentVisibility() {
+  const view = document.getElementById('filterView').value;
+  const base = {
+    kpi: true,
+    region: true,
+    ranking: true,
+    groupPie: true,
+    contribution: true,
+    opportunity: true,
+    customer: false
+  };
+  const settings = globalData.visibility || {};
+  return {...base, ...(settings[view] || {})};
+}
+
+function setSectionVisible(id, visible) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('is-hidden', !visible);
+}
+
+function applyVisibility() {
+  const v = getCurrentVisibility();
+  setSectionVisible('sectionKpi', v.kpi);
+  setSectionVisible('sectionRegion', v.region);
+  setSectionVisible('cardRanking', v.ranking);
+  setSectionVisible('cardGroupPie', v.groupPie);
+  setSectionVisible('cardContribution', v.contribution);
+  setSectionVisible('cardOpportunity', v.opportunity);
+}
+
 function getFilteredData() {
   const view = document.getElementById('filterView').value;
   const gFilter = document.getElementById('filterGroup').value;
@@ -488,11 +544,12 @@ function getFilteredData() {
 
 function renderAll() {
   if(!globalData) return;
+  applyVisibility();
   const filterData = getFilteredData();
   renderKPIs(filterData);
   renderCases(filterData.data);
   renderRankings();
-  renderCharts();
+  renderGroupFinancials();
   renderActionInsights(filterData);
 }
 
@@ -581,43 +638,65 @@ function renderRankings() {
   });
 }
 
-function renderCharts() {
-  Chart.defaults.font.family = '"Inter", sans-serif';
-  Chart.defaults.color = '#60767B';
+function renderGroupFinancials() {
   const timeFilter = document.getElementById('filterTime').value;
-  
-  let groupLabels = [];
-  let groupRevs = [];
-  globalData.groups.forEach(g => {
-    let tRev = 0;
-    if (timeFilter === 'year') tRev = g.rev_months.reduce((a,b)=>a+b, 0);
-    else {
-      let mStart = {'q1':0, 'q2':3, 'q3':6, 'q4':9}[timeFilter];
-      tRev = (g.rev_months[mStart]||0) + (g.rev_months[mStart+1]||0) + (g.rev_months[mStart+2]||0);
-    }
-    if (tRev > 0) {
-      groupLabels.push(g.name);
-      groupRevs.push(tRev);
-    }
-  });
+  const format萬 = v => (v / 10000).toLocaleString('zh-TW', { maximumFractionDigits: 0 });
+  const periodLabel = {'year':'全年', 'q1':'第一季', 'q2':'第二季', 'q3':'第三季', 'q4':'第四季'}[timeFilter];
 
-  if (groupPie) groupPie.destroy();
-  groupPie = new Chart(document.getElementById('groupPie'),{
-    type:'doughnut',
-    data:{ 
-      labels: groupLabels,
-      datasets:[{ 
-        data: groupRevs,
-        backgroundColor:['#263E44','#E6F31E','#6B8A8F','#A9B9BC','#0B9878'],
-        borderWidth:0, hoverOffset: 10
-      }] 
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false, cutout:'65%',
-      plugins:{ legend:{ position:'right' }}
-    }
-  });
+  const rows = (globalData.groups || []).map(g => {
+    const rev = getPeriodRevenue(g, timeFilter);
+    const target = timeFilter === 'year' ? (g.targets.year || 0) : (g.targets[timeFilter] || 0);
+    return {
+      name: g.name,
+      leader: g.leader,
+      rev,
+      target,
+      cases: g.cases || 0,
+      coop: g.coop || 0,
+      penetration: g.cases > 0 ? (g.coop || 0) / g.cases : 0,
+      avgPrice: (g.coop || 0) > 0 ? rev / g.coop : 0,
+      achieve: target > 0 ? rev / target : 0
+    };
+  }).sort((a, b) => b.rev - a.rev);
 
+  const totalRev = rows.reduce((sum, r) => sum + r.rev, 0);
+  const totalTarget = rows.reduce((sum, r) => sum + r.target, 0);
+  const bestGroup = rows[0];
+  const summaryBox = document.getElementById('groupFinancialSummary');
+  summaryBox.innerHTML = `
+    <div class="financial-summary-item">
+      <div class="financial-summary-label">${periodLabel}總業績</div>
+      <div class="financial-summary-value">${format萬(totalRev)}萬</div>
+    </div>
+    <div class="financial-summary-item">
+      <div class="financial-summary-label">整體達成率</div>
+      <div class="financial-summary-value">${totalTarget > 0 ? (totalRev / totalTarget * 100).toFixed(1) : '-'}%</div>
+    </div>
+    <div class="financial-summary-item">
+      <div class="financial-summary-label">最大占比組別</div>
+      <div class="financial-summary-value" style="font-size:18px">${bestGroup ? bestGroup.name : '-'}</div>
+    </div>`;
+
+  const tbody = document.querySelector('#groupFinancialTable tbody');
+  tbody.innerHTML = rows.map(r => {
+    const share = totalRev > 0 ? r.rev / totalRev : 0;
+    const achieveClass = r.achieve >= 1 ? 'pct-good' : (r.achieve >= 0.85 ? 'pct-warn' : 'pct-bad');
+    return `
+      <tr>
+        <td><div class="financial-group">${r.name}</div><div class="op-sub">組長 ${r.leader || '-'}</div></td>
+        <td class="num"><strong>${format萬(r.rev)}</strong> 萬</td>
+        <td>
+          <div class="financial-share">
+            <div class="financial-share-bg"><div class="financial-share-fill" style="width:${(share * 100).toFixed(0)}%"></div></div>
+            <span>${(share * 100).toFixed(1)}%</span>
+          </div>
+        </td>
+        <td class="num"><span class="${r.penetration >= 0.6 ? 'pct-good' : (r.penetration >= 0.4 ? 'pct-warn' : 'pct-bad')}">${(r.penetration * 100).toFixed(1)}%</span></td>
+        <td class="num">${format萬(r.avgPrice)} 萬</td>
+        <td class="num">${r.target > 0 ? format萬(r.target) + ' 萬' : '-'}</td>
+        <td class="num"><span class="${achieveClass}">${r.target > 0 ? (r.achieve * 100).toFixed(1) + '%' : '-'}</span></td>
+      </tr>`;
+  }).join('');
 }
 
 function getPeriodRevenue(item, timeFilter) {
@@ -625,6 +704,49 @@ function getPeriodRevenue(item, timeFilter) {
   if (timeFilter === 'year') return item.revenue || (item.rev_months ? item.rev_months.reduce((a,b)=>a+b,0) : 0);
   const mStart = {'q1':0, 'q2':3, 'q3':6, 'q4':9}[timeFilter];
   return item.rev_months ? (item.rev_months[mStart]||0) + (item.rev_months[mStart+1]||0) + (item.rev_months[mStart+2]||0) : 0;
+}
+
+function getYearRankRevenue(item) {
+  return item && item.rev_months ? item.rev_months.reduce((a,b)=>a+(b||0), 0) : (item ? item.revenue || 0 : 0);
+}
+
+function buildYearDualRankings(salesList) {
+  const base = (salesList || []).map(s => {
+    const yearRev = getYearRankRevenue(s);
+    const avg = s.coop > 0 ? yearRev / s.coop : 0;
+    return {
+      ...s,
+      yearRev,
+      yearAvg: avg,
+      yearPen: s.penetration || 0
+    };
+  });
+
+  const penSorted = base.slice().sort((a,b) => (b.yearPen - a.yearPen) || (b.yearAvg - a.yearAvg));
+  const avgSorted = base.slice().sort((a,b) => (b.yearAvg - a.yearAvg) || (b.yearPen - a.yearPen));
+  const rankByName = {};
+  penSorted.forEach((s,i) => {
+    if (!rankByName[s.name]) rankByName[s.name] = {};
+    rankByName[s.name].penRank = i + 1;
+  });
+  avgSorted.forEach((s,i) => {
+    if (!rankByName[s.name]) rankByName[s.name] = {};
+    rankByName[s.name].avgRank = i + 1;
+  });
+
+  const combined = base.map(s => {
+    const ranks = rankByName[s.name] || {};
+    const penRank = ranks.penRank || base.length;
+    const avgRank = ranks.avgRank || base.length;
+    return {
+      ...s,
+      penRank,
+      avgRank,
+      combinedRankScore: penRank + avgRank
+    };
+  }).sort((a,b) => (a.combinedRankScore - b.combinedRankScore) || (b.yearPen - a.yearPen) || (b.yearAvg - a.yearAvg));
+
+  return { penSorted, avgSorted, combined };
 }
 
 function renderActionInsights({data, rev, target}) {
@@ -635,35 +757,39 @@ function renderActionInsights({data, rev, target}) {
   const formatPct = v => `${(v * 100).toFixed(1)}%`;
   const format萬 = v => (v / 10000).toLocaleString('zh-TW', {maximumFractionDigits: 0});
   const allSales = getVisibleSales();
-  const currentGroup = data.group ? globalData.groups.find(g => g.name === data.group) : data;
+  const selectedGroupName = view === 'group' ? data.name : data.group;
+  const currentGroup = selectedGroupName ? globalData.groups.find(g => g.name === selectedGroupName) : data;
   const groupRev = currentGroup && currentGroup.rev_months ? getPeriodRevenue(currentGroup, timeFilter) : rev;
-  const groupMembers = data.group ? allSales.filter(s => s.group === data.group) : allSales;
-  const rankedMembers = groupMembers
-    .map(s => ({...s, periodRev: getPeriodRevenue(s, timeFilter)}))
-    .sort((a,b) => b.periodRev - a.periodRev);
-  const rankIndex = data.name ? rankedMembers.findIndex(s => s.name === data.name) : -1;
-  const share = groupRev > 0 ? rev / groupRev : 0;
+  const groupMembers = selectedGroupName ? allSales.filter(s => s.group === selectedGroupName) : allSales;
+  const yearRankings = buildYearDualRankings(groupMembers);
+  const currentYearRank = data.name ? yearRankings.combined.find(s => s.name === data.name) : null;
   const targetGap = Math.max((target || 0) - rev, 0);
   const uncontacted = Math.max((data.cases || 0) - (data.coop || 0), 0);
   const avgPerOpen = uncontacted > 0 ? targetGap / uncontacted : 0;
   const coopShare = currentGroup && currentGroup.coop ? (data.coop || 0) / currentGroup.coop : 0;
+  const contributionTitle = document.querySelector('#cardContribution .card-title');
+  if (contributionTitle) {
+    contributionTitle.textContent = selectedGroupName
+      ? `📈 ${selectedGroupName} 組內全年滲透率 / 客單價排行`
+      : '📈 2026 全年滲透率 / 客單價排行';
+  }
 
   if (view === 'sales' && data.name) {
     contributionBox.innerHTML = `
       <div class="insight-card">
-        <div class="insight-label">組內業績占比</div>
-        <div class="insight-value">${formatPct(share)}</div>
-        <div class="insight-note">${data.name} / ${data.group}，用選定期間業績計算</div>
+        <div class="insight-label">全年滲透率排名</div>
+        <div class="insight-value">${currentYearRank ? currentYearRank.penRank : '-'}<span class="unit"> / ${groupMembers.length}</span></div>
+        <div class="insight-note">${formatPct(data.penetration || 0)}，合作建案 ÷ 負責建案</div>
       </div>
       <div class="insight-card">
-        <div class="insight-label">組內排名</div>
-        <div class="insight-value">${rankIndex >= 0 ? rankIndex + 1 : '-'}<span class="unit"> / ${rankedMembers.length}</span></div>
-        <div class="insight-note">依選定期間業績由高到低排序</div>
+        <div class="insight-label">全年客單價排名</div>
+        <div class="insight-value">${currentYearRank ? currentYearRank.avgRank : '-'}<span class="unit"> / ${groupMembers.length}</span></div>
+        <div class="insight-note">${currentYearRank ? format萬(currentYearRank.yearAvg) : '0'} 萬，全年業績 ÷ 合作建案</div>
       </div>
       <div class="insight-card">
-        <div class="insight-label">合作建案占組比</div>
-        <div class="insight-value">${formatPct(coopShare)}</div>
-        <div class="insight-note">${data.coop || 0} 個合作建案 / 組內 ${currentGroup ? currentGroup.coop || 0 : 0} 個</div>
+        <div class="insight-label">全年雙指標綜合</div>
+        <div class="insight-value">${currentYearRank ? yearRankings.combined.findIndex(s => s.name === data.name) + 1 : '-'}<span class="unit"> / ${groupMembers.length}</span></div>
+        <div class="insight-note">滲透率排名 + 客單價排名，分數越低越前面</div>
       </div>
       <div class="insight-card">
         <div class="insight-label">尚未合作建案</div>
@@ -681,24 +807,30 @@ function renderActionInsights({data, rev, target}) {
         <div class="insight-note">距離目標差額 ÷ 未合作建案</div>
       </div>`;
   } else {
-    const totalRev = view === 'group' ? groupRev : getPeriodRevenue(globalData.overview, timeFilter);
-    const best = rankedMembers[0];
     const openCases = (data.regions || []).reduce((sum, r) => sum + (r.uncontacted || 0), 0);
+    const bestPen = yearRankings.penSorted[0];
+    const bestAvg = yearRankings.avgSorted[0];
+    const bestCombined = yearRankings.combined[0];
     contributionBox.innerHTML = `
       <div class="insight-card">
-        <div class="insight-label">目前範圍業績</div>
-        <div class="insight-value">${format萬(totalRev)}<span class="unit">萬</span></div>
-        <div class="insight-note">依目前時間與檢視對象計算</div>
+        <div class="insight-label">滲透率最佳</div>
+        <div class="insight-value" style="font-size:24px">${bestPen ? bestPen.name : '-'}</div>
+        <div class="insight-note">${bestPen ? `${formatPct(bestPen.yearPen)}，${bestPen.coop}/${bestPen.cases} 合作` : '目前無資料'}</div>
       </div>
       <div class="insight-card">
-        <div class="insight-label">最高貢獻業務</div>
-        <div class="insight-value" style="font-size:24px">${best ? best.name : '-'}</div>
-        <div class="insight-note">${best ? `${format萬(best.periodRev)} 萬，占 ${formatPct(totalRev ? best.periodRev / totalRev : 0)}` : '目前無資料'}</div>
+        <div class="insight-label">客單價最佳</div>
+        <div class="insight-value" style="font-size:24px">${bestAvg ? bestAvg.name : '-'}</div>
+        <div class="insight-note">${bestAvg ? `${format萬(bestAvg.yearAvg)} 萬，全年業績 / 合作建案` : '目前無資料'}</div>
       </div>
       <div class="insight-card">
-        <div class="insight-label">未合作建案池</div>
+        <div class="insight-label">全年綜合最佳</div>
+        <div class="insight-value" style="font-size:24px">${bestCombined ? bestCombined.name : '-'}</div>
+        <div class="insight-note">${bestCombined ? `滲透率第 ${bestCombined.penRank}，客單價第 ${bestCombined.avgRank}` : '目前無資料'}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">目前未合作建案池</div>
         <div class="insight-value insight-warning">${openCases}<span class="unit">案</span></div>
-        <div class="insight-note">目前範圍內仍可開發的建案量</div>
+        <div class="insight-note">可搭配雙指標看開發深度與變現能力</div>
       </div>`;
   }
 
